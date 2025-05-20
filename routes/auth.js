@@ -24,6 +24,16 @@ router.get('/dashboard', (req, res) => {
   res.send(`<h1>Bienvenido, ${nombre} ${apellido} 👋</h1><a href="/logout">Cerrar sesión</a>`);
 });
 
+router.get('/', (req, res) => {
+
+  if (!req.session.user) {
+    return res.redirect('/login');
+  }
+
+  res.render('index', { correo: req.session.user.correo });
+
+});
+
 router.get('/logout', (req, res) => {
   req.session.destroy((err) => {
     if (err) {
@@ -92,7 +102,7 @@ router.post('/login', async (req, res) => {
       correo: user.correo
     };
 
-    res.redirect('/dashboard');
+    res.redirect('/');
   } catch (err) {
     console.error('Error en login:', err);
     res.status(500).send('Error interno del servidor');

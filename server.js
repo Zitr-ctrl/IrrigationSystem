@@ -13,6 +13,7 @@ const __dirname = path.dirname(__filename);
 
 // Middleware
 app.use(express.urlencoded({ extended: true }));
+
 app.use(express.json());
 
 app.use(session({
@@ -29,6 +30,7 @@ app.use(authRoutes);
 app.use(express.static('public'));
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs'); // o usa HTML plano si prefieres
+
 
 // Inicio
 app.listen(PORT, () => {
