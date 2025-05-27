@@ -31,7 +31,6 @@ app.use(express.static('public'));
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs'); // o usa HTML plano si prefieres
 
-
 // Inicio
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);

@@ -25,13 +25,22 @@ router.get('/dashboard', (req, res) => {
 });
 
 router.get('/', (req, res) => {
-
   if (!req.session.user) {
     return res.redirect('/login');
   }
 
-  res.render('index', { correo: req.session.user.correo });
+  // ⚠️ Simulación de datos reales
+  const datosSimulados = {
+    bombaEncendida: true,
+    macetas: [
+      { humedad: 78, fecha: '2025-05-27 14:45' },
+      { humedad: 43, fecha: '2025-05-27 14:45' },
+      { humedad: 25, fecha: '2025-05-27 14:45' }
+    ],
+    correo: req.session.user.correo
+  };
 
+  res.render('index', datosSimulados);
 });
 
 router.get('/logout', (req, res) => {
@@ -74,6 +83,15 @@ router.post('/register', async (req, res) => {
   }
 });
 
+router.get('/historial', (req, res) => {
+
+  if (!req.session.user) {
+    return res.redirect('/login');
+  }
+
+  res.render('historial_riego', { correo: req.session.user.correo });
+
+});
 
 // Procesar login
 router.post('/login', async (req, res) => {
