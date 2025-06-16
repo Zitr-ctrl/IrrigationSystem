@@ -83,15 +83,38 @@ router.post('/register', async (req, res) => {
   }
 });
 
-router.get('/historial', (req, res) => {
-
+router.get('/historial', async (req, res) => {
   if (!req.session.user) {
     return res.redirect('/login');
   }
 
-  res.render('historial_riego', { correo: req.session.user.correo });
+  try {
+    const [lecturas] = await db.query(`
+      SELECT 
+        lectura_sensor.id,
+        sensor.tipo,
+        lectura_sensor.valor,
+        lectura_sensor.unidad,
+        lectura_sensor.timestamp,
+        zona_riego.nombre AS zona
+      FROM lectura_sensor
+      JOIN sensor ON lectura_sensor.sensor_id = sensor.id
+      LEFT JOIN zona_riego ON sensor.zona_id = zona_riego.id
+      ORDER BY lectura_sensor.timestamp DESC
+      LIMIT 100
+    `);
 
+    res.render('historial_riego', {
+      correo: req.session.user.correo,
+      lecturas
+    });
+  } catch (err) {
+    console.error('Error al obtener lecturas:', err);
+    res.status(500).send('Error al cargar historial');
+  }
 });
+
+
 
 // Procesar login
 router.post('/login', async (req, res) => {
