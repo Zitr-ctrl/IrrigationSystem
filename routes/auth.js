@@ -96,10 +96,10 @@ router.get('/historial', async (req, res) => {
         lectura_sensor.valor,
         lectura_sensor.unidad,
         lectura_sensor.timestamp,
-        zona_riego.nombre AS zona
+        maceta.nombre_maceta AS zona
       FROM lectura_sensor
       JOIN sensor ON lectura_sensor.sensor_id = sensor.id
-      LEFT JOIN zona_riego ON sensor.zona_id = zona_riego.id
+      LEFT JOIN maceta ON sensor.maceta_id = maceta.id
       ORDER BY lectura_sensor.timestamp DESC
       LIMIT 100
     `);
