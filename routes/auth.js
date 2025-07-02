@@ -24,24 +24,58 @@ router.get('/dashboard', (req, res) => {
   res.send(`<h1>Bienvenido, ${nombre} ${apellido} 👋</h1><a href="/logout">Cerrar sesión</a>`);
 });
 
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   if (!req.session.user) {
     return res.redirect('/login');
   }
 
-  // ⚠️ Simulación de datos reales
-  const datosSimulados = {
-    bombaEncendida: true,
-    macetas: [
-      { humedad: 78, fecha: '2025-05-27 14:45' },
-      { humedad: 43, fecha: '2025-05-27 14:45' },
-      { humedad: 25, fecha: '2025-05-27 14:45' }
-    ],
-    correo: req.session.user.correo
-  };
+  try {
+    // 1. Obtener la última lectura de cada sensor
+    const [lecturas] = await db.query(`
+      SELECT 
+        l.sensor_id,
+        s.maceta_id,
+        m.nombre_maceta,
+        l.valor,
+        l.timestamp
+      FROM lectura_sensor l
+      JOIN sensor s ON l.sensor_id = s.id
+      JOIN maceta m ON s.maceta_id = m.id
+      WHERE l.id IN (
+        SELECT MAX(id) FROM lectura_sensor GROUP BY sensor_id
+      )
+      ORDER BY s.maceta_id ASC
+    `);
 
-  res.render('index', datosSimulados);
+    // 2. Obtener el último estado de la bomba
+    const [ultimoRegistro] = await db.query(`
+      SELECT bomba_estado
+      FROM registro_riego
+      ORDER BY id DESC
+      LIMIT 1
+    `);
+
+    const bombaEncendida = ultimoRegistro[0]?.bomba_estado === 'ON';
+
+    // 3. Construir el array de macetas
+    const macetas = lecturas.map(l => ({
+      id: l.maceta_id,
+      nombre: l.nombre_maceta,
+      humedad: parseFloat(l.valor),
+      fecha: l.timestamp.toLocaleString()
+    }));
+
+    res.render('index', {
+      bombaEncendida,
+      macetas,
+      correo: req.session.user.correo
+    });
+  } catch (error) {
+    console.error('Error al obtener datos:', error);
+    res.status(500).send('Error al cargar la página principal');
+  }
 });
+
 
 router.get('/logout', (req, res) => {
   req.session.destroy((err) => {
@@ -147,6 +181,31 @@ router.post('/login', async (req, res) => {
   } catch (err) {
     console.error('Error en login:', err);
     res.status(500).send('Error interno del servidor');
+  }
+});
+
+// Ruta para actualizar humedad mínima
+router.post('/api/actualizar_humedad_minima', async (req, res) => {
+  const { maceta_id, humedad_minima } = req.body;
+
+  if (!maceta_id || humedad_minima === undefined) {
+    return res.status(400).json({ error: 'Datos incompletos' });
+  }
+
+  if (humedad_minima < 0 || humedad_minima > 100) {
+    return res.status(400).json({ error: 'El nivel debe ser entre 0 y 100.' });
+  }
+
+  try {
+    await db.query(
+      'UPDATE maceta SET humedad_minima = ? WHERE id = ?',
+      [humedad_minima, maceta_id]
+    );
+
+    res.json({ message: 'Nivel de humedad mínima actualizado correctamente.' });
+  } catch (err) {
+    console.error('Error al actualizar humedad mínima:', err);
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
 
