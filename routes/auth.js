@@ -30,12 +30,15 @@ router.get('/', async (req, res) => {
   }
 
   try {
-    // 1. Obtener la última lectura de cada sensor
+    // 1. Obtener la última lectura de cada sensor con datos de maceta
     const [lecturas] = await db.query(`
       SELECT 
         l.sensor_id,
         s.maceta_id,
         m.nombre_maceta,
+        m.nombre_planta,
+        m.tamaño_maceta,
+        m.humedad_minima,
         l.valor,
         l.timestamp
       FROM lectura_sensor l
@@ -47,7 +50,7 @@ router.get('/', async (req, res) => {
       ORDER BY s.maceta_id ASC
     `);
 
-    // 2. Obtener el último estado de la bomba
+    // 2. Último estado de la bomba
     const [ultimoRegistro] = await db.query(`
       SELECT bomba_estado
       FROM registro_riego
@@ -57,10 +60,13 @@ router.get('/', async (req, res) => {
 
     const bombaEncendida = ultimoRegistro[0]?.bomba_estado === 'ON';
 
-    // 3. Construir el array de macetas
+    // 3. Construir array de macetas
     const macetas = lecturas.map(l => ({
       id: l.maceta_id,
       nombre: l.nombre_maceta,
+      planta: l.nombre_planta,
+      tamaño: l.tamaño_maceta,
+      humedad_minima: parseFloat(l.humedad_minima),
       humedad: parseFloat(l.valor),
       fecha: l.timestamp.toLocaleString()
     }));
@@ -205,6 +211,28 @@ router.post('/api/actualizar_humedad_minima', async (req, res) => {
     res.json({ message: 'Nivel de humedad mínima actualizado correctamente.' });
   } catch (err) {
     console.error('Error al actualizar humedad mínima:', err);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+
+// Ruta para editar datos de la maceta
+router.post('/api/editar_maceta', async (req, res) => {
+  const { maceta_id, nombre_maceta, nombre_planta, tamaño_maceta } = req.body;
+
+  if (!maceta_id || !nombre_maceta || !nombre_planta || !tamaño_maceta) {
+    return res.status(400).json({ error: 'Datos incompletos' });
+  }
+
+  try {
+    await db.query(
+      'UPDATE maceta SET nombre_maceta = ?, nombre_planta = ?, tamaño_maceta = ? WHERE id = ?',
+      [nombre_maceta, nombre_planta, tamaño_maceta, maceta_id]
+    );
+
+    res.json({ message: 'Información actualizada correctamente.' });
+  } catch (err) {
+    console.error('Error al actualizar maceta:', err);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });

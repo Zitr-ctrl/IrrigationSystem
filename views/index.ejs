@@ -53,23 +53,33 @@
             <div class="card-body text-center">
               <h5 class="card-title">🪴 <%= maceta.nombre %></h5>
               <p class="card-text">
-                Humedad actual: <strong><%= maceta.humedad %>%</strong><br />
-                Humedad mínima: <strong><%= maceta.humedad_minima %>%</strong><br />
+                Planta: <strong><%= maceta.planta %></strong><br/>
+                Tamaño: <strong><%= maceta.tamaño %></strong><br/>
+                Humedad actual: <strong><%= maceta.humedad %>%</strong><br/>
+                Humedad mínima: <strong><%= maceta.humedad_minima %>%</strong><br/>
                 <span class="emoji">
                   <% if (maceta.humedad >= 70) { %> 💧 <% } else if (maceta.humedad >= 40) { %> 🌿 <% } else { %> 🥀 <% } %>
                 </span>
               </p>
               <small class="text-muted">Actualizado: <%= maceta.fecha %></small>
             </div>
-            <!-- Botón para abrir el modal -->
             <div class="card-footer text-center mt-3">
-              <button class="btn btn-warning"
+              <button class="btn btn-warning me-2"
                 data-bs-toggle="modal"
                 data-bs-target="#setHumedadModal"
                 data-id="<%= maceta.id %>"
-                data-zona="<%= maceta.nombre %>"
-              >
+                data-zona="<%= maceta.nombre %>">
                 Establecer humedad mínima
+              </button>
+              <br>
+              <button class="btn btn-primary"
+                data-bs-toggle="modal"
+                data-bs-target="#editMacetaModal"
+                data-id="<%= maceta.id %>"
+                data-nombre="<%= maceta.nombre %>"
+                data-planta="<%= maceta.planta %>"
+                data-tamaño="<%= maceta.tamaño %>">
+                Editar información
               </button>
             </div>
           </div>
@@ -78,7 +88,7 @@
     </div>
   </div>
 
-  <!-- Modal -->
+  <!-- Modal Humedad Mínima -->
   <div class="modal fade" id="setHumedadModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog">
       <div class="modal-content">
@@ -105,12 +115,45 @@
     </div>
   </div>
 
+  <!-- Modal Editar Información -->
+  <div class="modal fade" id="editMacetaModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Editar información de la maceta</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <form id="editMacetaForm">
+            <input type="hidden" id="macetaIdEditar" />
+            <div class="mb-3">
+              <label class="form-label">Nombre de la maceta</label>
+              <input type="text" class="form-control" id="macetaNombre" required />
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Nombre de la planta</label>
+              <input type="text" class="form-control" id="macetaPlanta" required />
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Tamaño de la maceta</label>
+              <input type="text" class="form-control" id="macetaTamaño" required />
+            </div>
+            <div class="mb-3 text-end">
+              <button type="submit" class="btn btn-primary">Guardar cambios</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
   <script>
     setInterval(() => location.reload(), 10000);
 
+    // Modal humedad mínima
     let macetaIdSeleccionada = null;
     const modal = document.getElementById('setHumedadModal');
     modal.addEventListener('show.bs.modal', event => {
@@ -131,6 +174,41 @@
         success: resp => {
           alert(resp.message);
           $('#setHumedadModal').modal('hide');
+          location.reload();
+        },
+        error: xhr => {
+          alert('Error: ' + xhr.responseJSON.error);
+        }
+      });
+    });
+
+    // Modal editar información
+    const modalEditar = document.getElementById('editMacetaModal');
+    modalEditar.addEventListener('show.bs.modal', event => {
+      const btn = event.relatedTarget;
+      document.getElementById('macetaIdEditar').value = btn.getAttribute('data-id');
+      document.getElementById('macetaNombre').value = btn.getAttribute('data-nombre');
+      document.getElementById('macetaPlanta').value = btn.getAttribute('data-planta');
+      document.getElementById('macetaTamaño').value = btn.getAttribute('data-tamaño');
+    });
+
+    $('#editMacetaForm').submit(e => {
+      e.preventDefault();
+      const data = {
+        maceta_id: $('#macetaIdEditar').val(),
+        nombre_maceta: $('#macetaNombre').val(),
+        nombre_planta: $('#macetaPlanta').val(),
+        tamaño_maceta: $('#macetaTamaño').val()
+      };
+      $.ajax({
+        url: '/api/editar_maceta',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(data),
+        success: resp => {
+          alert(resp.message);
+          $('#editMacetaModal').modal('hide');
+          location.reload();
         },
         error: xhr => {
           alert('Error: ' + xhr.responseJSON.error);
