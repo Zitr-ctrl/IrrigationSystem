@@ -13,12 +13,16 @@
     <link rel="stylesheet" href="/css/datatables.min.css" />
   </head>
   <body>
-    <!-- Navbar -->
+    <!-- Navbar unificado -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-success">
       <div class="container-fluid">
         <a class="navbar-brand" href="#">Riego Inteligente</a>
         <div class="d-flex">
           <a href="/" class="btn btn-outline-light me-2">Inicio</a>
+          <a href="/historial" class="btn btn-outline-light me-2">Historial</a>
+          <% if (user.tipo_user_id === 1) { %>
+            <a href="/register" class="btn btn-outline-light me-2">Registrar Usuario</a>
+          <% } %>
           <span class="navbar-text text-white me-3"><%= correo %></span>
           <a href="/logout" class="btn btn-outline-light">Cerrar sesión</a>
         </div>
@@ -46,8 +50,7 @@
             <td><%= l.tipo %></td>
             <td><%= l.valor %> <%= l.unidad %></td>
             <td>
-              <%= l.timestamp.toLocaleString ? l.timestamp.toLocaleString() :
-              l.timestamp %>
+              <%= l.timestamp.toLocaleString ? l.timestamp.toLocaleString() : l.timestamp %>
             </td>
           </tr>
           <% }) %>
