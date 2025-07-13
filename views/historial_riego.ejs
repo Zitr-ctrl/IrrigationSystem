@@ -32,6 +32,14 @@
     <!-- Contenido principal -->
     <div class="container mt-5">
       <h3 class="text-center mb-4">📜 Historial de Activaciones de Riego</h3>
+
+      <!-- Botón de exportación -->
+      <div class="mb-3 text-end">
+        <a href="/exportar-excel" class="btn btn-success">
+          📥 Exportar a Excel
+        </a>
+      </div>
+
       <table id="mi-tabla" class="table table-bordered text-center">
         <thead class="table-success">
           <tr>
@@ -39,6 +47,7 @@
             <th>Zona</th>
             <th>Tipo</th>
             <th>Valor</th>
+            <th>Humedad Mínima</th>
             <th>Fecha</th>
           </tr>
         </thead>
@@ -49,9 +58,8 @@
             <td><%= l.zona || 'Sin zona' %></td>
             <td><%= l.tipo %></td>
             <td><%= l.valor %> <%= l.unidad %></td>
-            <td>
-              <%= l.timestamp.toLocaleString ? l.timestamp.toLocaleString() : l.timestamp %>
-            </td>
+            <td><%= l.humedad_minima !== null ? l.humedad_minima + ' %' : 'No definida' %></td>
+            <td><%= l.timestamp.toLocaleString ? l.timestamp.toLocaleString() : l.timestamp %></td>
           </tr>
           <% }) %>
         </tbody>

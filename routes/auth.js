@@ -1,7 +1,8 @@
 import express from "express";
 import bcrypt from "bcrypt";
 import db from "../db/connection.js";
-import { ensureAuth, ensureAdmin } from '../middlewares/auth.js';
+import ExcelJS from "exceljs";
+import { ensureAuth, ensureAdmin } from "../middlewares/auth.js";
 
 const router = express.Router();
 
@@ -11,8 +12,11 @@ router.get("/login", (req, res) => {
 });
 
 // Página de registro
-router.get('/register', ensureAuth, ensureAdmin, (req, res) => {
-  res.sendFile('register.html', { root: 'views' });
+router.get("/register", ensureAuth, ensureAdmin, (req, res) => {
+  res.render("register", {
+    correo: req.session.user.correo,
+    user: req.session.user,
+  });
 });
 
 router.get("/dashboard", (req, res) => {
@@ -79,14 +83,13 @@ router.get("/", async (req, res) => {
       bombaEncendida,
       macetas,
       correo: req.session.user.correo,
-      user: req.session.user
+      user: req.session.user,
     });
   } catch (error) {
     console.error("Error al obtener datos:", error);
     res.status(500).send("Error al cargar la página principal");
   }
 });
-
 
 router.get("/logout", (req, res) => {
   req.session.destroy((err) => {
@@ -98,21 +101,17 @@ router.get("/logout", (req, res) => {
   });
 });
 
-// Procesar registro
 router.post("/register", ensureAuth, ensureAdmin, async (req, res) => {
   const { nombre, apellido, correo, username, password } = req.body;
 
   try {
-    // Verificar si el username o correo ya existen
     const [existing] = await db.query(
       "SELECT * FROM user WHERE username = ? OR correo = ?",
       [username, correo]
     );
 
     if (existing.length > 0) {
-      return res
-        .status(400)
-        .send("El nombre de usuario o correo ya está registrado");
+      return res.status(400).json({ error: "Usuario o correo ya registrado" });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -122,16 +121,16 @@ router.post("/register", ensureAuth, ensureAdmin, async (req, res) => {
       [nombre, apellido, correo, username, hashedPassword]
     );
 
-    res.redirect("/login");
+    res.json({ message: "Usuario registrado correctamente" });
   } catch (err) {
     console.error("Error al registrar usuario:", err);
-    res.status(500).send("Error interno del servidor");
+    res.status(500).json({ error: "Error interno del servidor" });
   }
 });
 
-router.get('/historial', async (req, res) => {
+router.get("/historial", async (req, res) => {
   if (!req.session.user) {
-    return res.redirect('/login');
+    return res.redirect("/login");
   }
 
   try {
@@ -142,7 +141,8 @@ router.get('/historial', async (req, res) => {
         lectura_sensor.valor,
         lectura_sensor.unidad,
         lectura_sensor.timestamp,
-        maceta.nombre_maceta AS zona
+        maceta.nombre_maceta AS zona,
+        maceta.humedad_minima
       FROM lectura_sensor
       JOIN sensor ON lectura_sensor.sensor_id = sensor.id
       LEFT JOIN maceta ON sensor.maceta_id = maceta.id
@@ -150,17 +150,77 @@ router.get('/historial', async (req, res) => {
       LIMIT 100
     `);
 
-    res.render('historial_riego', {
+    res.render("historial_riego", {
       correo: req.session.user.correo,
       user: req.session.user,
-      lecturas
+      lecturas,
     });
   } catch (err) {
-    console.error('Error al obtener lecturas:', err);
-    res.status(500).send('Error al cargar historial');
+    console.error("Error al obtener lecturas:", err);
+    res.status(500).send("Error al cargar historial");
   }
 });
 
+router.get("/exportar-excel", async (req, res) => {
+  if (!req.session.user) return res.redirect("/login");
+  try {
+    const [lecturas] = await db.query(`
+      SELECT 
+        lectura_sensor.id,
+        sensor.tipo,
+        lectura_sensor.valor,
+        lectura_sensor.unidad,
+        lectura_sensor.timestamp,
+        maceta.nombre_maceta AS zona,
+        maceta.humedad_minima
+      FROM lectura_sensor
+      JOIN sensor ON lectura_sensor.sensor_id = sensor.id
+      LEFT JOIN maceta ON sensor.maceta_id = maceta.id
+      ORDER BY lectura_sensor.timestamp DESC
+      LIMIT 100
+    `);
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Historial de Riego");
+
+    worksheet.columns = [
+      { header: "ID", key: "id", width: 10 },
+      { header: "Zona", key: "zona", width: 20 },
+      { header: "Tipo", key: "tipo", width: 15 },
+      { header: "Valor", key: "valor", width: 15 },
+      { header: "Unidad", key: "unidad", width: 10 },
+      { header: "Humedad Mínima", key: "humedad_minima", width: 18 },
+      { header: "Fecha", key: "timestamp", width: 25 },
+    ];
+
+    lecturas.forEach((l) => {
+      worksheet.addRow({
+        id: l.id,
+        zona: l.zona || "Sin zona",
+        tipo: l.tipo,
+        valor: l.valor,
+        unidad: l.unidad,
+        humedad_minima: l.humedad_minima ?? "No definida",
+        timestamp: new Date(l.timestamp).toLocaleString(),
+      });
+    });
+
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=historial_riego.xlsx"
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    console.error("❌ Error al generar Excel:", error);
+    res.status(500).send("Error al exportar historial");
+  }
+});
 
 // Procesar login
 router.post("/login", async (req, res) => {
@@ -207,32 +267,65 @@ router.post("/login", async (req, res) => {
   }
 });
 
-// Ruta para actualizar humedad mínima
-router.post("/api/actualizar_humedad_minima", ensureAuth, ensureAdmin, async (req, res) => {
-  const { maceta_id, humedad_minima } = req.body;
+router.post(
+  "/api/actualizar_humedad_minima",
+  ensureAuth,
+  ensureAdmin,
+  async (req, res) => {
+    const { maceta_id, humedad_minima } = req.body;
 
-  if (!maceta_id || humedad_minima === undefined) {
-    return res.status(400).json({ error: "Datos incompletos" });
+    if (!maceta_id || humedad_minima === undefined) {
+      return res.status(400).json({ error: "Datos incompletos" });
+    }
+
+    if (humedad_minima < 0 || humedad_minima > 100) {
+      return res
+        .status(400)
+        .json({ error: "El nivel debe ser entre 0 y 100." });
+    }
+
+    try {
+      // Obtener valor anterior
+      const [rows] = await db.query(
+        "SELECT humedad_minima FROM maceta WHERE id = ?",
+        [maceta_id]
+      );
+
+      if (rows.length === 0) {
+        return res.status(404).json({ error: "Maceta no encontrada" });
+      }
+
+      const anterior = rows[0].humedad_minima;
+
+      // Actualizar
+      await db.query("UPDATE maceta SET humedad_minima = ? WHERE id = ?", [
+        humedad_minima,
+        maceta_id,
+      ]);
+
+      // Log del cambio
+      await db.query(
+        `INSERT INTO log_maceta (maceta_id, user_id, accion, valor_anterior, valor_nuevo)
+       VALUES (?, ?, ?, ?, ?)`,
+        [
+          maceta_id,
+          req.session.user.id,
+          "Actualizó humedad mínima",
+          anterior.toString(),
+          humedad_minima.toString(),
+        ]
+      );
+
+      res.json({
+        message: "Nivel de humedad mínima actualizado correctamente.",
+      });
+    } catch (err) {
+      console.error("Error al actualizar humedad mínima:", err);
+      res.status(500).json({ error: "Error interno del servidor" });
+    }
   }
+);
 
-  if (humedad_minima < 0 || humedad_minima > 100) {
-    return res.status(400).json({ error: "El nivel debe ser entre 0 y 100." });
-  }
-
-  try {
-    await db.query("UPDATE maceta SET humedad_minima = ? WHERE id = ?", [
-      humedad_minima,
-      maceta_id,
-    ]);
-
-    res.json({ message: "Nivel de humedad mínima actualizado correctamente." });
-  } catch (err) {
-    console.error("Error al actualizar humedad mínima:", err);
-    res.status(500).json({ error: "Error interno del servidor" });
-  }
-});
-
-// Ruta para editar datos de la maceta
 router.post("/api/editar_maceta", ensureAuth, ensureAdmin, async (req, res) => {
   const { maceta_id, nombre_maceta, nombre_planta, tamaño_maceta } = req.body;
 
@@ -241,10 +334,58 @@ router.post("/api/editar_maceta", ensureAuth, ensureAdmin, async (req, res) => {
   }
 
   try {
+    // Obtener datos anteriores
+    const [rows] = await db.query(
+      "SELECT nombre_maceta, nombre_planta, tamaño_maceta FROM maceta WHERE id = ?",
+      [maceta_id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Maceta no encontrada" });
+    }
+
+    const anterior = rows[0];
+
+    // Actualizar datos
     await db.query(
       "UPDATE maceta SET nombre_maceta = ?, nombre_planta = ?, tamaño_maceta = ? WHERE id = ?",
       [nombre_maceta, nombre_planta, tamaño_maceta, maceta_id]
     );
+
+    // Comparar y registrar cambios
+    const cambios = [];
+
+    if (anterior.nombre_maceta !== nombre_maceta) {
+      cambios.push([
+        "Actualizó nombre de maceta",
+        anterior.nombre_maceta,
+        nombre_maceta,
+      ]);
+    }
+
+    if (anterior.nombre_planta !== nombre_planta) {
+      cambios.push([
+        "Actualizó nombre de planta",
+        anterior.nombre_planta,
+        nombre_planta,
+      ]);
+    }
+
+    if (anterior.tamaño_maceta !== tamaño_maceta) {
+      cambios.push([
+        "Actualizó tamaño de maceta",
+        anterior.tamaño_maceta,
+        tamaño_maceta,
+      ]);
+    }
+
+    for (const [accion, valorAnterior, valorNuevo] of cambios) {
+      await db.query(
+        `INSERT INTO log_maceta (maceta_id, user_id, accion, valor_anterior, valor_nuevo)
+         VALUES (?, ?, ?, ?, ?)`,
+        [maceta_id, req.session.user.id, accion, valorAnterior, valorNuevo]
+      );
+    }
 
     res.json({ message: "Información actualizada correctamente." });
   } catch (err) {
