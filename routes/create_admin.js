@@ -11,10 +11,10 @@ const dbConfig = {
 };
 
 const nuevoAdmin = {
-  nombre: 'Admin',
-  apellido: 'Principal',
-  correo: 'admin@gmail.com',
-  username: 'admin',
+  nombre: 'Admin2',
+  apellido: 'Principal 2',
+  correo: 'admin2@gmail.com',
+  username: 'admin2',
   password: 'admin123', // Puedes cambiarla aquí
   tipo_user_id: 1 // 1 = admin
 };

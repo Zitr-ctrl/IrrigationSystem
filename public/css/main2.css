@@ -1,0 +1,18 @@
+body {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  position: relative; /* necesario para el pseudo-elemento */
+}
+
+body::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("../img/fondo2.jpeg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: blur(8px); /* difumina solo la imagen */
+  z-index: -1; /* manda la imagen al fondo */
+}
